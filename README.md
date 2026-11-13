@@ -32,9 +32,10 @@ Current commands:
 
 - `:CodechumanOpen` — show local task checkouts in a right split.
 - `:CodechumanRefresh` — reload the local list.
-- In the panel: `<Enter>` opens `app.js`, `l` shows cached `lesson.md`,
-  `v` runs local JS syntax check, `t` runs opt-in public JS tests,
-  `b` returns to the list, and `q` closes it.
+- In the panel: `<Enter>` opens `app.js`; `l` shows `lesson.md`,
+  `a` shows `task.md`, `z` shows read-only `quiz.json`, `e` shows
+  cached examples, `v` runs JS syntax check, `t` runs opt-in public JS
+  tests, `b` returns to the list, and `q` closes it.
 
 Public tests execute JavaScript locally as the student OS user, without a
 sandbox. Run only trusted tests. These checks never award official Mastery.

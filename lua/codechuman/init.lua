@@ -27,7 +27,8 @@ local function render_entries()
   local lines = {
     "Codechuman",
     "────────────────────────────────────────",
-    "<Enter> code  l lesson  v syntax  t tests  r reload  q close",
+    "<Enter> code  l lesson  a task  z quiz  e examples",
+    "v syntax  t public tests  r reload  b back  q close",
     "",
   }
   local rows = {}
@@ -120,22 +121,96 @@ function M.edit_selected()
   vim.cmd("edit " .. vim.fn.fnameescape(filename))
 end
 
-function M.lesson_selected()
+local function show_cached_material(material, heading)
   local entry = selected_entry()
   if not entry then
     return
   end
-  local filename = entry.directory .. "/.learning/lesson.md"
-  if vim.fn.filereadable(filename) ~= 1 then
-    vim.notify("This lesson has not been cached locally", vim.log.levels.WARN)
+  local filename = entry.directory .. "/.learning/" .. material
+  local stat = vim.uv.fs_lstat(filename)
+  if not stat or stat.type ~= "file" or stat.size > 512 * 1024 then
+    vim.notify("This material is missing, unsafe or too large", vim.log.levels.WARN)
     return
   end
   local ok, lines = pcall(vim.fn.readfile, filename)
   if ok then
-    local output = { "Lesson", "────────────────────────────────────────", "Press b to return to the course list", "" }
+    local output = { heading, "────────────────────────────────────────", "Press b to return to the course list", "" }
     vim.list_extend(output, lines)
     render(output)
   end
+end
+
+function M.lesson_selected()
+  show_cached_material("lesson.md", "Lesson")
+end
+
+function M.task_selected()
+  show_cached_material("task.md", "Task")
+end
+
+function M.quiz_selected()
+  show_cached_material("quiz.json", "Quiz (saved JSON, read-only)")
+end
+
+function M.examples_selected()
+  local entry = selected_entry()
+  if not entry then
+    return
+  end
+  local example_root = entry.directory .. "/.learning/examples"
+  local files = {}
+  local function scan(dir, prefix, depth)
+    if depth > 5 or #files >= 100 then
+      return
+    end
+    local iterator = vim.uv.fs_scandir(dir)
+    if not iterator then
+      return
+    end
+    while true do
+      local name, kind = vim.uv.fs_scandir_next(iterator)
+      if not name then
+        break
+      end
+      if name:match("^[a-zA-Z0-9][a-zA-Z0-9._-]*$") and name ~= "." and name ~= ".." then
+        local filename = dir .. "/" .. name
+        if kind == "directory" then
+          scan(filename, prefix .. name .. "/", depth + 1)
+        elseif kind == "file" then
+          local stat = vim.uv.fs_lstat(filename)
+          if stat and stat.type == "file" and stat.size <= 512 * 1024 then
+            table.insert(files, { filename = filename, label = prefix .. name })
+          end
+        end
+      end
+      if #files >= 100 then
+        break
+      end
+    end
+  end
+  scan(example_root, "", 1)
+  table.sort(files, function(left, right)
+    return left.label < right.label
+  end)
+  local lines = { "Examples", "────────────────────────────────────────", "Press b to return to the course list", "" }
+  if #files == 0 then
+    table.insert(lines, "No cached examples for this lesson.")
+  end
+  for _, file in ipairs(files) do
+    table.insert(lines, "▶ " .. file.label)
+    local ok, content = pcall(vim.fn.readfile, file.filename, "", 80)
+    if ok then
+      vim.list_extend(lines, content)
+    else
+      table.insert(lines, "[cannot read example]")
+    end
+    table.insert(lines, "")
+    if #lines >= 1000 then
+      table.insert(lines, "[remaining examples truncated]")
+      break
+    end
+  end
+  render(lines)
 end
 
 local function validate_selected(command, title)
@@ -192,6 +267,9 @@ function M.open()
     r = M.refresh,
     b = render_entries,
     l = M.lesson_selected,
+    a = M.task_selected,
+    z = M.quiz_selected,
+    e = M.examples_selected,
     v = M.validate_selected,
     t = M.public_tests_selected,
     ["<CR>"] = M.edit_selected,
