@@ -64,7 +64,7 @@ local function run_cli(args, callback)
   end
   local argv = { M.config.cli_path }
   vim.list_extend(argv, args)
-  vim.system(argv, { text = true, timeout = 15000 }, function(result)
+  vim.system(argv, { text = true, timeout = 30000 }, function(result)
     vim.schedule(function()
       if result.code ~= 0 then
         callback(nil, "Codechuman CLI command failed")
