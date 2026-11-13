@@ -1,0 +1,11 @@
+{
+  "name": "codechuman-nvim-tests",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "devDependencies": {
+    "luaparse": "^0.3.1"
+  }
+}
