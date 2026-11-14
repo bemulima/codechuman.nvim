@@ -52,11 +52,14 @@ sandbox. Run only trusted tests. These checks never award official Mastery.
 ```sh
 npm ci
 npm test
+NVIM_BIN=/path/to/nvim npm run test:nvim
 ```
 
-These tests parse Lua source and verify the public commands. A headless Neovim
-runtime test is still needed before release; `luaparse` passing alone does not
-prove compatibility with all LazyVim/AstroNvim configurations.
+The default tests parse Lua source and verify the public commands. The optional
+`test:nvim` invokes a real Neovim 0.10+ process with an isolated mock CLI and
+checks the hidden token prompt, exact stdin checkout, duplicate-start guard and
+invalid UUID refusal. It does not replace installation checks for LazyVim,
+AstroNvim or an authenticated live Gateway.
 
 Account sign-in, server-based courses, AI Teacher, live Sandbox sync and official
 Submit are **not implemented** in this first slice. `CodechumanCheckout` is a
