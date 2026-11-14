@@ -14,6 +14,23 @@ test("plugin provides the expected public commands", () => {
   const source = readFileSync(new URL("../plugin/codechuman.lua", import.meta.url), "utf8");
   assert.match(source, /CodechumanOpen/);
   assert.match(source, /CodechumanRefresh/);
+  assert.match(source, /CodechumanCheckout/);
+  assert.match(source, /nargs = 1/);
+});
+
+test("remote checkout uses a temporary secret and CLI stdin pipe without shell arguments", () => {
+  const source = readFileSync(new URL("../lua/codechuman/init.lua", import.meta.url), "utf8");
+  assert.match(source, /function M\.checkout_remote/);
+  assert.match(source, /vim\.fn\.inputsecret\(/);
+  assert.match(source, /canonical_uuid\(task_instance_id\)/);
+  assert.match(source, /checkout_busy/);
+  assert.match(source, /\"--task-instance\", task_instance_id/);
+  assert.match(source, /\"--token-stdin\"/);
+  assert.match(source, /stdin = true/);
+  assert.match(source, /process:write\(token\)/);
+  assert.match(source, /process:write\(nil\)/);
+  assert.doesNotMatch(source, /\"--token\", token/);
+  assert.doesNotMatch(source, /vim\.fn\.system\(/);
 });
 
 test("panel can read cached lesson, task, quiz and examples without AI", () => {

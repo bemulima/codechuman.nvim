@@ -19,6 +19,7 @@ return {
     opts = {
       cli_path = "codechuman",
       workspace_root = vim.fn.expand("~/.codechuman"),
+      api_base_url = "https://YOUR-CODECHUMAN-GATEWAY", -- Your trusted HTTPS origin
       width = 46,
     },
   },
@@ -32,6 +33,12 @@ Current commands:
 
 - `:CodechumanOpen` — show local task checkouts in a right split.
 - `:CodechumanRefresh` — reload the local list.
+- `:CodechumanCheckout <TaskInstance UUID>` — authenticated HTTPS starter
+  checkout for an existing Student-owned task. Requires the Go CLI from
+  `bemulima/codechuman-cli` with `checkout-remote` descriptor v1 support,
+  an HTTPS Gateway configured in user plugin options, and a temporary Student
+  access token obtained outside Neovim. The token is prompted invisibly, piped
+  to the CLI stdin, and never saved by this plugin.
 - In the panel: `<Enter>` opens `app.js`; `l` shows `lesson.md`,
   `a` shows `task.md`, `z` shows read-only `quiz.json`, `e` shows
   cached examples, `v` runs JS syntax check, `t` runs opt-in public JS
@@ -45,13 +52,20 @@ sandbox. Run only trusted tests. These checks never award official Mastery.
 ```sh
 npm ci
 npm test
+NVIM_BIN=/path/to/nvim npm run test:nvim
 ```
 
-These tests parse Lua source and verify the public commands. A headless Neovim
-runtime test is still needed before release; `luaparse` passing alone does not
-prove compatibility with all LazyVim/AstroNvim configurations.
+The default tests parse Lua source and verify the public commands. The optional
+`test:nvim` invokes a real Neovim 0.10+ process with an isolated mock CLI and
+checks the hidden token prompt, exact stdin checkout, duplicate-start guard and
+invalid UUID refusal. It does not replace installation checks for LazyVim,
+AstroNvim or an authenticated live Gateway.
 
 Account sign-in, server-based courses, AI Teacher, live Sandbox sync and official
-Submit are **not implemented** in this first slice.
+Submit are **not implemented** in this first slice. `CodechumanCheckout` is a
+manual-token preview of the existing server-authorized Git checkout flow, not
+in-editor sign-in or a production release. The server may keep routes disabled
+until explicitly activated. The CLI checkout contains the pinned Git starter,
+not Course lesson/quiz materials, which require separate owner endpoints.
 
 This public source has no open-source license grant yet.

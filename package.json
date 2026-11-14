@@ -3,7 +3,8 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/syntax.test.mjs",
+    "test:nvim": "node --test test/native.test.mjs"
   },
   "devDependencies": {
     "luaparse": "^0.3.1"
