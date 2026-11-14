@@ -3,11 +3,13 @@ local M = {}
 M.config = {
   cli_path = "codechuman",
   workspace_root = vim.fn.expand("~/.codechuman"),
+  api_base_url = "", -- User-configured HTTPS Gateway origin; never loaded from a project.
   width = 46,
   keymap = nil, -- User may opt in to e.g. <leader>B.
 }
 
 local panel = { window = nil, buffer = nil, previous_window = nil, entries = {}, rows = {} }
+local checkout_busy = false
 
 local function is_open()
   return panel.window ~= nil and vim.api.nvim_win_is_valid(panel.window)
@@ -34,7 +36,7 @@ local function render_entries()
   local rows = {}
   if #panel.entries == 0 then
     table.insert(lines, "No local lessons yet.")
-    table.insert(lines, "Use Codechuman CLI checkout to download one.")
+    table.insert(lines, "Use :CodechumanCheckout <TaskInstance UUID> to download one.")
   else
     for _, entry in ipairs(panel.entries) do
       local manifest = entry.manifest
@@ -79,6 +81,88 @@ local function run_cli(args, callback)
       end
     end)
   end)
+end
+
+local function canonical_uuid(value)
+  return type(value) == "string" and #value == 36
+    and value:match("^[0-9a-f]+%-[0-9a-f]+%-[0-9a-f]+%-[0-9a-f]+%-[0-9a-f]+$") ~= nil
+    and value:sub(9, 9) == "-" and value:sub(14, 14) == "-"
+    and value:sub(19, 19) == "-" and value:sub(24, 24) == "-"
+end
+
+-- Preview bridge to the authenticated CLI path. No token is saved or passed
+-- via argv, environment variables, shell commands or Neovim history.
+-- Native sign-in/refresh remains a separate future owner-approved slice.
+function M.checkout_remote(task_instance_id)
+  if not canonical_uuid(task_instance_id) then
+    vim.notify("Expected a canonical lowercase TaskInstance UUID", vim.log.levels.WARN)
+    return
+  end
+  if checkout_busy then
+    vim.notify("A Codechuman checkout is already running", vim.log.levels.WARN)
+    return
+  end
+  if type(M.config.api_base_url) ~= "string" or not M.config.api_base_url:match("^https://") then
+    vim.notify("Configure api_base_url with the Codechuman HTTPS Gateway origin", vim.log.levels.WARN)
+    return
+  end
+  if vim.fn.executable(M.config.cli_path) ~= 1 then
+    vim.notify("Install codechuman-cli and configure cli_path", vim.log.levels.WARN)
+    return
+  end
+
+  local token = vim.fn.inputsecret("Codechuman access token (not saved): ")
+  if type(token) ~= "string" or token == "" then
+    return
+  end
+  if #token > 8192 or token:find("[%s%z]") then
+    token = nil
+    vim.notify("Invalid access token format", vim.log.levels.WARN)
+    return
+  end
+
+  local argv = {
+    M.config.cli_path, "checkout-remote",
+    "--api-base", M.config.api_base_url,
+    "--task-instance", task_instance_id,
+    "--root", M.config.workspace_root,
+    "--token-stdin",
+  }
+  checkout_busy = true
+  local started, process = pcall(vim.system, argv, { text = true, stdin = true, timeout = 150000 }, function(result)
+    vim.schedule(function()
+      checkout_busy = false
+      if result.code ~= 0 then
+        -- Do not forward subprocess stderr; it could contain credential material.
+        vim.notify("Codechuman checkout failed (exit " .. tostring(result.code) .. ")", vim.log.levels.ERROR)
+        return
+      end
+      local valid, reply = pcall(vim.json.decode, result.stdout or "")
+      if not valid or type(reply) ~= "table" or type(reply.directory) ~= "string" then
+        vim.notify("Codechuman CLI returned an invalid checkout result", vim.log.levels.ERROR)
+        return
+      end
+      vim.notify("Codechuman checkout ready: " .. reply.directory, vim.log.levels.INFO)
+      M.refresh()
+    end)
+  end)
+  if not started then
+    token = nil
+    checkout_busy = false
+    vim.notify("Could not start Codechuman CLI", vim.log.levels.ERROR)
+    return
+  end
+
+  local written = pcall(function()
+    process:write(token)
+    process:write(nil)
+  end)
+  token = nil
+  if not written then
+    process:kill("sigterm")
+    checkout_busy = false
+    vim.notify("Could not pass token securely to Codechuman CLI", vim.log.levels.ERROR)
+  end
 end
 
 function M.refresh()
