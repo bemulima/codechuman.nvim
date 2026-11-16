@@ -31,3 +31,7 @@ for _,name in ipairs({'CodechumanRun','CodechumanCheck'}) do
 end
 
 vim.api.nvim_create_user_command('CodechumanSubmit',function()require('codechuman.teacher').submit()end,{desc='Explicit official Practice submission (confirmation required)'})
+
+vim.api.nvim_create_user_command('CodechumanSyncSaved',function()require('codechuman.sync').manual()end,{desc='Explicit saved main.go upload and atomic ACK'})
+vim.api.nvim_create_user_command('CodechumanAutoSyncEnable',function()require('codechuman.sync').enable()end,{desc='Opt in to saved main.go debounce after manual ACK'})
+vim.api.nvim_create_user_command('CodechumanAutoSyncDisable',function()require('codechuman.sync').disable()end,{desc='Stop all saved-main sync and forget sync credentials'})

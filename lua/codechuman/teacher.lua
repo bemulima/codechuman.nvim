@@ -37,6 +37,7 @@ local function draw(s,reply)
 end
 local function request(s,body,key)
  if session~=s or s.busy then return end
+ if body and body~='' and require('codechuman.sync').blocks(s.workspace) then vim.notify('Disable auto sync before asking Teacher');return end
  s.busy=true
  local argv={s.config.cli_path,'teacher-chat','--api-base',s.config.api_base_url,'--workspace',s.workspace,'--request-stdin'}
  local ok,process=pcall(vim.system,argv,{text=true,stdin=vim.json.encode({token=s.token,body=body or '',idempotency_key=key or '',sync_main=s.config.teacher_sync_main==true}),timeout=115000},function(result)
@@ -58,6 +59,7 @@ function M.check()
    if not s then return end
    if not vim.wait(3000,function()return session~=s or not s.busy end,20) or session~=s then return end
  end
+ if require('codechuman.sync').blocks(s.workspace) then vim.notify('Disable auto sync before Run/Check');return end
  if not s.config.teacher_checks_enabled then vim.notify('Sandbox checks are not enabled in trusted configuration',vim.log.levels.WARN);return end
  if s.busy then vim.notify('Wait for the current Teacher or Sandbox request');return end
  s.busy=true
@@ -82,9 +84,11 @@ function M.check()
 end
 function M.submit()
  local s=session
+ if s and require('codechuman.sync').blocks(s.workspace) then vim.notify('Disable auto sync before official Submit');return end
  if not s then M.open();s=session;if not s then return end;if not vim.wait(3000,function()return not s.busy end,20) then return end end
  if s.busy then vim.notify('Wait for the current request');return end
  local function execute(scope)
+  if require('codechuman.sync').blocks(s.workspace) then vim.notify('Disable auto sync before official Submit');return end
   if not scope then return end
   local pending=s.pendingSubmit
   local prompt=pending and 'Replay the SAME official Submit request without uploading code?' or 'Official Submit may change task progress and freeze editing. Send saved main.go?'

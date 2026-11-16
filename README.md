@@ -148,3 +148,17 @@ Trusted user configuration may opt in with `teacher_checks_enabled = true` and `
 PASS/FAIL are advisory, ERROR is technical, STALE requires another check. The operation does not submit a solution or advance official progress. This bounded profile supports only main.go HTTP health exercises, not arbitrary Go programs. Teacher sees the latest matching Sandbox receipt and code when you ask.
 
 `:CodechumanSubmit` (Teacher panel `u`) is an explicit official Practice submission. Choose milestone/final and confirm; it may freeze editing and change server-owned progress. Run/Check never invokes it. Unconfirmed/VALIDATING results retain their original key/scope/milestone for replay without uploading different code. A timeout is not PASS. Closing a panel discards its in-memory operation state; retain any unconfirmed receipt/key before starting another official operation.
+
+### Saved main.go auto sync (opt-in)
+
+From the task main.go, run `:CodechumanSyncSaved` for an explicit upload and
+atomic server ACK. Then `:CodechumanAutoSyncEnable` enables a one-second debounce
+on saved main.go only. It never commits/pushes Git, invokes AI, runs checks or
+submits automatically. A changed/missing fence, rejected ACK, configuration
+change or connection failure stops sync and preserves local code. Review the
+remote state before another explicit manual upload.
+
+Run `:CodechumanAutoSyncDisable` before Teacher questions, Run/Check or official
+Submit. Disabling stops the queue and forgets the sync token. Tokens are prompted
+locally and sent through CLI stdin only; no credentials are written to config.
+Existing Teacher operations continue to use their separate temporary session.
