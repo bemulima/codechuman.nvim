@@ -11,7 +11,14 @@ local function workspace()
 end
 local function draw(s,reply)
  if session~=s or not vim.api.nvim_buf_is_valid(s.buffer) then return end
- local lines={'Codechuman Teacher — current TaskInstance','s ask  r refresh  q close',s.config.teacher_sync_main and 'Context: saved main.go via Sandbox; use :write before asking.' or 'Context: server-owned task/step; local code is not synced.',''}
+ local lines={'Codechuman Teacher — current TaskInstance',s.config.teacher_checks_enabled and 's ask  t run/check  r refresh  q close' or 's ask  r refresh  q close',s.config.teacher_sync_main and 'Context: saved main.go via Sandbox; use :write before asking.' or 'Context: server-owned task/step; local code is not synced.',''}
+ if s.check then
+   local c=s.check
+   table.insert(lines,'Sandbox check: '..c.outcome..(c.stale and ' (STALE — save and check again)' or ''))
+   table.insert(lines,'Advisory public checks; official progress is unchanged.')
+   for _,issue in ipairs(c.issues) do table.insert(lines,'  '..issue.code) end
+   table.insert(lines,'')
+ end
  for _,message in ipairs(reply.messages or {}) do
    table.insert(lines,message.author_type=='personal_teacher' and 'Teacher:' or 'You:')
    for line in (tostring(message.body or '')..'\n'):gmatch('(.-)\n') do
@@ -39,6 +46,35 @@ local function request(s,body,key)
  end)
  if not ok then s.busy=false;vim.notify('Could not start Teacher CLI',vim.log.levels.ERROR) else s.process=process end
 end
+function M.check()
+ local s=session
+ if not s then
+   M.open();s=session
+   if not s then return end
+   if not vim.wait(3000,function()return session~=s or not s.busy end,20) or session~=s then return end
+ end
+ if not s.config.teacher_checks_enabled then vim.notify('Sandbox checks are not enabled in trusted configuration',vim.log.levels.WARN);return end
+ if s.busy then vim.notify('Wait for the current Teacher or Sandbox request');return end
+ s.busy=true
+ vim.notify('Checking saved main.go in Sandbox...')
+ local argv={s.config.cli_path,'check-solution','--api-base',s.config.api_base_url,'--workspace',s.workspace,'--request-stdin'}
+ local ok,process=pcall(vim.system,argv,{text=true,stdin=vim.json.encode({token=s.token}),timeout=135000},function(result)
+  vim.schedule(function()
+   s.busy=false
+   if session~=s or not vim.api.nvim_buf_is_valid(s.buffer) then return end
+   if result.code~=0 then vim.notify('Sandbox check unavailable (exit '..tostring(result.code)..'); no learner verdict.',vim.log.levels.ERROR);return end
+   local valid,c=pcall(vim.json.decode,result.stdout or '')
+   local outcomes={PASS=true,FAIL=true,ERROR=true,RUNNING=true}
+   if not valid or type(c)~='table' or not outcomes[c.outcome] or c.advisory~=true or type(c.stale)~='boolean' or type(c.issues)~='table' or #c.issues>7 then vim.notify('Invalid Sandbox check response',vim.log.levels.ERROR);return end
+   for _,issue in ipairs(c.issues) do
+    if type(issue)~='table' or type(issue.code)~='string' or #issue.code>128 or not issue.code:match('^[A-Z][A-Z0-9_]*$') then vim.notify('Invalid Sandbox issue',vim.log.levels.ERROR);return end
+   end
+   s.check=c;draw(s,s.last or {messages={}})
+   vim.notify('Sandbox: '..c.outcome..(c.stale and ' (stale)' or '')..'. Press s to ask Teacher.')
+  end)
+ end)
+ if not ok then s.busy=false;vim.notify('Could not start Sandbox CLI',vim.log.levels.ERROR) else s.process=process end
+end
 function M.ask(body)
  local s=session;if not s then return end
  if s.busy then vim.notify('Teacher is processing the previous request');return end
@@ -60,6 +96,7 @@ function M.open()
  vim.bo[s.buffer].buftype='nofile';vim.bo[s.buffer].bufhidden='wipe';vim.bo[s.buffer].swapfile=false;vim.bo[s.buffer].filetype='codechuman-teacher';vim.bo[s.buffer].modifiable=false
  vim.api.nvim_create_autocmd('BufWipeout',{buffer=s.buffer,once=true,callback=function()s.token=nil;if s.process then pcall(s.process.kill,s.process,15) end;if session==s then session=nil end end})
  vim.keymap.set('n','s',function()M.ask()end,{buffer=s.buffer})
+ vim.keymap.set('n','t',function()M.check()end,{buffer=s.buffer})
  vim.keymap.set('n','r',function()request(s)end,{buffer=s.buffer})
  vim.keymap.set('n','q',function()vim.api.nvim_buf_delete(s.buffer,{force=true})end,{buffer=s.buffer})
  draw(s,{messages={}});request(s)

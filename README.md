@@ -140,3 +140,9 @@ When lazy-loading the plugin by command, add `CodechumanTeacher` and
 `nvim --headless -u NONE -l test/native_teacher.lua` for token/session boundary
 and plain-text rendering. Real provider execution requires explicit isolated
 runtime authorization.
+
+### Sandbox run/check and Teacher (IDE28 stand)
+
+Trusted user configuration may opt in with `teacher_checks_enabled = true` and `teacher_sync_main = true`. Both default false. In a task checkout, `:write`, then `:CodechumanCheck` (alias `:CodechumanRun`) executes saved main.go and public HTTP checks through Gateway/Sandbox. In the Teacher panel `t` runs checks, `s` asks Teacher, `r` reloads Dialog. A Student token is requested once per panel and kept in memory only; closing the panel clears it. No automatic model request is sent by Run/Check.
+
+PASS/FAIL are advisory, ERROR is technical, STALE requires another check. The operation does not submit a solution or advance official progress. This bounded profile supports only main.go HTTP health exercises, not arbitrary Go programs. Teacher sees the latest matching Sandbox receipt and code when you ask.

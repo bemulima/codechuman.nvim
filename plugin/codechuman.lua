@@ -25,3 +25,7 @@ end, { desc = 'Open task-scoped Teacher chat through Gateway and Dialog' })
 vim.api.nvim_create_user_command('CodechumanAsk', function(args)
   require('codechuman.teacher').ask(args.args ~= '' and args.args or nil)
 end, { nargs = '*', desc = 'Ask in the open task Teacher conversation' })
+
+for _,name in ipairs({'CodechumanRun','CodechumanCheck'}) do
+ vim.api.nvim_create_user_command(name,function()require('codechuman.teacher').check()end,{desc='Run saved main.go and advisory public checks in Sandbox'})
+end
