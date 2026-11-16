@@ -123,8 +123,15 @@ arguments may enter your editor command history, so prefer the prompt.
 
 The token is kept only for this open panel, passed through CLI stdin, never
 saved in project/config/history. The server verifies actual TaskInstance
-ownership and derives LearningAction identity. The chat does not upload local
-code; it uses the Runtime-owned frozen task/step. Dialog remains the only
+ownership and derives LearningAction identity. By default the chat uses only the Runtime-owned frozen task/step. Set
+`teacher_sync_main = true` explicitly in your trusted user config to upload
+only the saved regular UTF-8 `main.go` (up to 16 KiB) to the owner-bound Sandbox
+before each question. Use `:write` first; unsaved editor changes are excluded.
+A missing real V2 Sandbox binding, stale fence, upload error, or readback mismatch
+stops the question. No directory traversal or environment/private files are
+uploaded. The server must separately enable its default-OFF Teacher workspace
+projection; it reads a committed Sandbox generation when processing the question,
+not a Submission snapshot. Concurrent saves may advance that generation. Dialog remains the only
 canonical conversation store. Pending responses may be refreshed without
 resending the question. AI responses are advisory and cannot award mastery.
 

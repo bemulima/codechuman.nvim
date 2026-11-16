@@ -1,12 +1,12 @@
 vim.opt.runtimepath:prepend(vim.fn.getcwd())
 vim.cmd('runtime plugin/codechuman.lua')
 local dir=vim.fn.tempname();vim.fn.mkdir(dir..'/.learning','p');vim.fn.writefile({'{}'},dir..'/.learning/manifest.json');vim.fn.writefile({'package main'},dir..'/main.go');vim.cmd('edit '..dir..'/main.go')
-require('codechuman').setup({cli_path=vim.v.progpath,api_base_url='https://example.org'})
+require('codechuman').setup({cli_path=vim.v.progpath,api_base_url='https://example.org',teacher_sync_main=true})
 local prompts,calls=0,0
 vim.fn.inputsecret=function()prompts=prompts+1;return 'synthetic-secret' end
 local original=vim.system
 vim.system=function(argv,opts,callback)
- calls=calls+1;assert(not table.concat(argv,' '):find('synthetic-secret',1,true),'token in argv');local data=vim.json.decode(opts.stdin);assert(data.token=='synthetic-secret');assert(argv[2]=='teacher-chat')
+ calls=calls+1;assert(not table.concat(argv,' '):find('synthetic-secret',1,true),'token in argv');local data=vim.json.decode(opts.stdin);assert(data.token=='synthetic-secret');assert(data.sync_main==true,'saved-code opt-in missing');assert(argv[2]=='teacher-chat')
  if data.body~='' then assert(data.idempotency_key:match('^[0-9a-f]+%-[0-9a-f]+%-4[0-9a-f]+%-8[0-9a-f]+%-[0-9a-f]+$'),'invalid key') end
  vim.schedule(function()callback({code=0,stdout=vim.json.encode({messages={{author_type='personal_teacher',body='Question\27[31m'}}})})end)
  return {kill=function()end}

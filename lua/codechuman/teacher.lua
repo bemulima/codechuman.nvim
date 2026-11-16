@@ -11,7 +11,7 @@ local function workspace()
 end
 local function draw(s,reply)
  if session~=s or not vim.api.nvim_buf_is_valid(s.buffer) then return end
- local lines={'Codechuman Teacher — current TaskInstance','s ask  r refresh  q close','Context: server-owned task/step; local code is not synced.',''}
+ local lines={'Codechuman Teacher — current TaskInstance','s ask  r refresh  q close',s.config.teacher_sync_main and 'Context: saved main.go via Sandbox; use :write before asking.' or 'Context: server-owned task/step; local code is not synced.',''}
  for _,message in ipairs(reply.messages or {}) do
    table.insert(lines,message.author_type=='personal_teacher' and 'Teacher:' or 'You:')
    for line in (tostring(message.body or '')..'\n'):gmatch('(.-)\n') do
@@ -27,7 +27,7 @@ local function request(s,body,key)
  if session~=s or s.busy then return end
  s.busy=true
  local argv={s.config.cli_path,'teacher-chat','--api-base',s.config.api_base_url,'--workspace',s.workspace,'--request-stdin'}
- local ok,process=pcall(vim.system,argv,{text=true,stdin=vim.json.encode({token=s.token,body=body or '',idempotency_key=key or ''}),timeout=115000},function(result)
+ local ok,process=pcall(vim.system,argv,{text=true,stdin=vim.json.encode({token=s.token,body=body or '',idempotency_key=key or '',sync_main=s.config.teacher_sync_main==true}),timeout=115000},function(result)
   vim.schedule(function()
    s.busy=false
    if session~=s or not vim.api.nvim_buf_is_valid(s.buffer) then return end

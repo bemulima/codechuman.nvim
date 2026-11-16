@@ -4,6 +4,7 @@ M.config = {
   cli_path = "codechuman",
   workspace_root = vim.fn.expand("~/.codechuman"),
   api_base_url = "", -- User-configured HTTPS Gateway origin; never loaded from a project.
+  teacher_sync_main = false, -- Explicit saved main.go upload through Sandbox before each question.
   width = 46,
   keymap = nil, -- User may opt in to e.g. <leader>B.
 }
