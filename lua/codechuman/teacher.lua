@@ -91,9 +91,11 @@ function M.submit()
   if require('codechuman.sync').blocks(s.workspace) then vim.notify('Disable auto sync before official Submit');return end
   if not scope then return end
   local pending=s.pendingSubmit
+  if pending and not s.submitRetryable then vim.notify('Official Submit process was not confirmed. Original key retained; check official history before recovery.',vim.log.levels.ERROR);return end
   local prompt=pending and 'Replay the SAME official Submit request without uploading code?' or 'Official Submit may change task progress and freeze editing. Send saved main.go?'
   if vim.fn.confirm(prompt,'&Send\n&Cancel',2)~=1 then return end
   local request=pending or {scope=scope,idempotency_key=string.format('%08x-%04x-4%03x-8%03x-%012x',vim.fn.rand(),vim.fn.rand()%65536,vim.fn.rand()%4096,vim.fn.rand()%4096,vim.fn.rand())}
+  if not pending then s.submitRetryable=false end
   local input=vim.tbl_extend('force',request,{token=s.token,replay=pending~=nil});s.pendingSubmit=request;s.busy=true
   local ok,process=pcall(vim.system,{s.config.cli_path,'submit-solution','--api-base',s.config.api_base_url,'--workspace',s.workspace,'--request-stdin'},{text=true,stdin=vim.json.encode(input),timeout=135000},function(result)
    vim.schedule(function()
@@ -101,7 +103,7 @@ function M.submit()
     if result.code~=0 then vim.notify('Official Submit not confirmed. Check status before creating another request.',vim.log.levels.ERROR);return end
     local valid,v=pcall(vim.json.decode,result.stdout or '')
     if not valid or type(v)~='table' or v.idempotency_key~=request.idempotency_key or v.scope~=request.scope or type(v.uncertain)~='boolean' then vim.notify('Invalid official receipt; keep the same key',vim.log.levels.ERROR);return end
-    s.submitReceipt=v
+    s.submitRetryable=true;s.submitReceipt=v
     if v.uncertain or (v.submission and v.submission.status=='VALIDATING') then s.pendingSubmit={scope=v.scope,idempotency_key=v.idempotency_key,milestone_id=v.milestone_id} else s.pendingSubmit=nil end
     draw(s,s.last or {messages={}})
    end)

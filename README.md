@@ -162,3 +162,7 @@ Run `:CodechumanAutoSyncDisable` before Teacher questions, Run/Check or official
 Submit. Disabling stops the queue and forgets the sync token. Tokens are prompted
 locally and sent through CLI stdin only; no credentials are written to config.
 Existing Teacher operations continue to use their separate temporary session.
+
+If the CLI process exits without a valid official receipt, Submit keeps the
+original key but blocks replay until official history is checked. Only a valid
+CLI receipt confirms the upload phase and permits same-key replay.
