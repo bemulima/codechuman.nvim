@@ -29,3 +29,5 @@ end, { nargs = '*', desc = 'Ask in the open task Teacher conversation' })
 for _,name in ipairs({'CodechumanRun','CodechumanCheck'}) do
  vim.api.nvim_create_user_command(name,function()require('codechuman.teacher').check()end,{desc='Run saved main.go and advisory public checks in Sandbox'})
 end
+
+vim.api.nvim_create_user_command('CodechumanSubmit',function()require('codechuman.teacher').submit()end,{desc='Explicit official Practice submission (confirmation required)'})

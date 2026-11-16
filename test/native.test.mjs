@@ -48,7 +48,7 @@ test("native Neovim opens the revision-pinned lesson from open-remote", () => {
   }
 });
 
-for (const [file, marker] of [["native_teacher.lua", "NATIVE_TEACHER_SESSION_SECURITY_PASS"], ["native_check.lua", "NATIVE_SANDBOX_CHECK_PASS"]]) {
+for (const [file, marker] of [["native_teacher.lua", "NATIVE_TEACHER_SESSION_SECURITY_PASS"], ["native_check.lua", "NATIVE_SANDBOX_CHECK_PASS"], ["native_submit.lua", "NATIVE_OFFICIAL_SUBMIT_CONFIRM_REPLAY_PASS"]]) {
  test(`native Neovim ${file}`, () => {
   const result=spawnSync(process.env.NVIM_BIN || "nvim",["--headless","-u","NONE","-i","NONE","-l",join(repo,"test",file)],{cwd:repo,encoding:"utf8",timeout:15000});
   if(result.error)throw result.error;
