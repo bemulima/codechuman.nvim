@@ -14,3 +14,7 @@ end, { desc = "Refresh Codechuman local courses" })
 vim.api.nvim_create_user_command("CodechumanCheckout", function(args)
   require("codechuman").checkout_remote(args.args)
 end, { nargs = 1, desc = "Fetch an authorized TaskInstance via HTTPS and the Codechuman CLI" })
+
+vim.api.nvim_create_user_command("CodechumanOpenTask", function(args)
+  require("codechuman").open_task(args.args)
+end, { nargs = 1, desc = "Fetch and open an authorized lesson and starter via HTTPS" })

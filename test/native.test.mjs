@@ -27,3 +27,23 @@ test("native Neovim executes checkout through an authenticated CLI stdin pipe", 
     rmSync(sandbox, { recursive: true, force: true });
   }
 });
+
+test("native Neovim opens the revision-pinned lesson from open-remote", () => {
+  const sandbox = mkdtempSync(join(tmpdir(), "codechuman-nvim-open-"));
+  try {
+    const executable = join(sandbox, "codechuman");
+    copyFileSync(new URL("./fixtures/open_cli_stub.mjs", import.meta.url), executable);
+    chmodSync(executable, 0o700);
+    const result = spawnSync(process.env.NVIM_BIN || "nvim",
+      ["--headless", "-u", "NONE", "-i", "NONE", "-l", join(repo, "test/native_open.lua")], {
+        cwd: repo, encoding: "utf8", timeout: 15000,
+        env: { ...process.env, CODECHUMAN_NVIM_TEST_CLI: executable,
+          CODECHUMAN_NVIM_TEST_ROOT: join(sandbox, "cache") },
+      });
+    if (result.error) throw result.error;
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stdout + result.stderr, /NATIVE_NVIM_OPEN_TASK_PASS/);
+  } finally {
+    rmSync(sandbox, { recursive: true, force: true });
+  }
+});
