@@ -111,3 +111,25 @@ an approved test environment. Materials remain in the matching immutable
 revision directory; the Sandbox code sync remains the official source workflow.
 
 This public source has no open-source license grant yet.
+
+## Teacher chat through Gateway and Dialog
+
+Open a file inside an authorized checkout (lesson/task/example or main.go), then
+run `:CodechumanTeacher`. Supply a short-lived Student token at the hidden
+prompt. The side panel reads the existing task-bound conversation from Dialog.
+Press `s` to ask a question, `r` to refresh, `q` to close and clear the in-memory
+token. `:CodechumanAsk` opens the same question prompt; text passed as command
+arguments may enter your editor command history, so prefer the prompt.
+
+The token is kept only for this open panel, passed through CLI stdin, never
+saved in project/config/history. The server verifies actual TaskInstance
+ownership and derives LearningAction identity. The chat does not upload local
+code; it uses the Runtime-owned frozen task/step. Dialog remains the only
+canonical conversation store. Pending responses may be refreshed without
+resending the question. AI responses are advisory and cannot award mastery.
+
+When lazy-loading the plugin by command, add `CodechumanTeacher` and
+`CodechumanAsk` to the plugin spec's `cmd` list. Source tests include
+`nvim --headless -u NONE -l test/native_teacher.lua` for token/session boundary
+and plain-text rendering. Real provider execution requires explicit isolated
+runtime authorization.

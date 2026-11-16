@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import luaparse from "luaparse";
 
-for (const filename of ["plugin/codechuman.lua", "lua/codechuman/init.lua"]) {
+for (const filename of ["plugin/codechuman.lua", "lua/codechuman/init.lua", "lua/codechuman/teacher.lua"]) {
   test(`Lua syntax: ${filename}`, () => {
     const source = readFileSync(new URL(`../${filename}`, import.meta.url), "utf8");
     assert.doesNotThrow(() => luaparse.parse(source, { luaVersion: "5.1" }));

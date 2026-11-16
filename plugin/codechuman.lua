@@ -18,3 +18,10 @@ end, { nargs = 1, desc = "Fetch an authorized TaskInstance via HTTPS and the Cod
 vim.api.nvim_create_user_command("CodechumanOpenTask", function(args)
   require("codechuman").open_task(args.args)
 end, { nargs = 1, desc = "Fetch and open an authorized lesson and starter via HTTPS" })
+
+vim.api.nvim_create_user_command('CodechumanTeacher', function()
+  require('codechuman.teacher').open()
+end, { desc = 'Open task-scoped Teacher chat through Gateway and Dialog' })
+vim.api.nvim_create_user_command('CodechumanAsk', function(args)
+  require('codechuman.teacher').ask(args.args ~= '' and args.args or nil)
+end, { nargs = '*', desc = 'Ask in the open task Teacher conversation' })
