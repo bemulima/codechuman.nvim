@@ -4,6 +4,8 @@ M.config = {
   cli_path = "codechuman",
   workspace_root = vim.fn.expand("~/.codechuman"),
   api_base_url = "", -- User-configured HTTPS Gateway origin; never loaded from a project.
+  teacher_checks_enabled = false, -- Explicit bounded Sandbox run/check; no official progress.
+  teacher_sync_main = false, -- Explicit saved main.go upload through Sandbox before each question.
   width = 46,
   keymap = nil, -- User may opt in to e.g. <leader>B.
 }
@@ -29,14 +31,14 @@ local function render_entries()
   local lines = {
     "Codechuman",
     "────────────────────────────────────────",
-    "<Enter> code  l lesson  a task  z quiz  e examples",
+    "<Enter> code  o open lesson  l lesson  a task  z quiz  e examples",
     "v syntax  t public tests  r reload  b back  q close",
     "",
   }
   local rows = {}
   if #panel.entries == 0 then
     table.insert(lines, "No local lessons yet.")
-    table.insert(lines, "Use :CodechumanCheckout <TaskInstance UUID> to download one.")
+    table.insert(lines, "Use :CodechumanCheckout <UUID> for code or :CodechumanOpenTask <UUID> for lesson + code.")
   else
     for _, entry in ipairs(panel.entries) do
       local manifest = entry.manifest
@@ -86,14 +88,73 @@ end
 local function canonical_uuid(value)
   return type(value) == "string" and #value == 36
     and value:match("^[0-9a-f]+%-[0-9a-f]+%-[0-9a-f]+%-[0-9a-f]+%-[0-9a-f]+$") ~= nil
+    and value ~= "00000000-0000-0000-0000-000000000000"
     and value:sub(9, 9) == "-" and value:sub(14, 14) == "-"
     and value:sub(19, 19) == "-" and value:sub(24, 24) == "-"
 end
 
--- Preview bridge to the authenticated CLI path. No token is saved or passed
--- via argv, environment variables, shell commands or Neovim history.
--- Native sign-in/refresh remains a separate future owner-approved slice.
-function M.checkout_remote(task_instance_id)
+local function real_directory(path)
+  local stat = vim.uv.fs_lstat(path)
+  return stat ~= nil and stat.type == "directory"
+end
+
+local function revision_material_directory(directory)
+  if not real_directory(directory) then
+    return nil
+  end
+  local learning = directory .. "/.learning"
+  if not real_directory(learning) then
+    return nil
+  end
+  local manifest_path = learning .. "/manifest.json"
+  local manifest_stat = vim.uv.fs_lstat(manifest_path)
+  if not manifest_stat or manifest_stat.type ~= "file" or manifest_stat.size > 16 * 1024 then
+    return nil
+  end
+  local ok, lines = pcall(vim.fn.readfile, manifest_path)
+  if not ok then
+    return nil
+  end
+  local valid, manifest = pcall(vim.json.decode, table.concat(lines, "\n"))
+  if not valid or type(manifest) ~= "table" or not canonical_uuid(manifest.lesson_revision) then
+    return nil
+  end
+  local materials = learning .. "/materials"
+  local revision = materials .. "/" .. manifest.lesson_revision
+  if not real_directory(materials) or not real_directory(revision) then
+    return nil
+  end
+  return revision
+end
+
+local function material_directory(entry)
+  local revision = revision_material_directory(entry.directory)
+  if revision then
+    return revision
+  end
+  -- Older locally created specs may place public files directly in .learning.
+  -- Remote TaskInstances use canonical revisions and never fall back to stale data.
+  local learning = entry.directory .. "/.learning"
+  local manifest_path = learning .. "/manifest.json"
+  if not real_directory(learning) then
+    return nil
+  end
+  local stat = vim.uv.fs_lstat(manifest_path)
+  if stat and stat.type == "file" and stat.size <= 16 * 1024 then
+    local ok, lines = pcall(vim.fn.readfile, manifest_path)
+    if ok then
+      local valid, manifest = pcall(vim.json.decode, table.concat(lines, "\n"))
+      if valid and type(manifest) == "table" and canonical_uuid(manifest.lesson_revision) then
+        return nil
+      end
+    end
+  end
+  return learning
+end
+
+-- Tokens are temporary Neovim input and CLI stdin only. They never enter argv,
+-- environment variables, shell history, repo URLs or config files.
+local function remote_task(task_instance_id, command)
   if not canonical_uuid(task_instance_id) then
     vim.notify("Expected a canonical lowercase TaskInstance UUID", vim.log.levels.WARN)
     return
@@ -122,7 +183,7 @@ function M.checkout_remote(task_instance_id)
   end
 
   local argv = {
-    M.config.cli_path, "checkout-remote",
+    M.config.cli_path, command,
     "--api-base", M.config.api_base_url,
     "--task-instance", task_instance_id,
     "--root", M.config.workspace_root,
@@ -142,7 +203,26 @@ function M.checkout_remote(task_instance_id)
         vim.notify("Codechuman CLI returned an invalid checkout result", vim.log.levels.ERROR)
         return
       end
-      vim.notify("Codechuman checkout ready: " .. reply.directory, vim.log.levels.INFO)
+      if command == "open-remote" then
+        local material_root = revision_material_directory(reply.directory)
+        if not material_root or reply.materials_directory ~= material_root then
+          vim.notify("Codechuman CLI returned an invalid lesson cache", vim.log.levels.ERROR)
+          return
+        end
+        local lesson = material_root .. "/lesson.md"
+        local lesson_stat = vim.uv.fs_lstat(lesson)
+        if not lesson_stat or lesson_stat.type ~= "file" or lesson_stat.size > 512 * 1024 then
+          vim.notify("The authorized lesson file is missing or unsafe", vim.log.levels.ERROR)
+          return
+        end
+        if is_open() and panel.previous_window and vim.api.nvim_win_is_valid(panel.previous_window) then
+          vim.api.nvim_set_current_win(panel.previous_window)
+        end
+        vim.cmd("edit " .. vim.fn.fnameescape(lesson))
+        vim.notify("Authorized Codechuman lesson opened", vim.log.levels.INFO)
+      else
+        vim.notify("Codechuman checkout ready: " .. reply.directory, vim.log.levels.INFO)
+      end
       M.refresh()
     end)
   end)
@@ -163,6 +243,24 @@ function M.checkout_remote(task_instance_id)
     checkout_busy = false
     vim.notify("Could not pass token securely to Codechuman CLI", vim.log.levels.ERROR)
   end
+end
+
+function M.checkout_remote(task_instance_id)
+  remote_task(task_instance_id, "checkout-remote")
+end
+
+function M.open_task(task_instance_id)
+  remote_task(task_instance_id, "open-remote")
+end
+
+function M.open_task_selected()
+  local entry = selected_entry()
+  local task_instance_id = entry and entry.manifest and entry.manifest.task_instance_id
+  if not canonical_uuid(task_instance_id) then
+    vim.notify("The selected checkout has no valid TaskInstance identity", vim.log.levels.WARN)
+    return
+  end
+  M.open_task(task_instance_id)
 end
 
 function M.refresh()
@@ -210,7 +308,12 @@ local function show_cached_material(material, heading)
   if not entry then
     return
   end
-  local filename = entry.directory .. "/.learning/" .. material
+  local root = material_directory(entry)
+  if not root then
+    vim.notify("No materials are cached for this lesson revision", vim.log.levels.WARN)
+    return
+  end
+  local filename = root .. "/" .. material
   local stat = vim.uv.fs_lstat(filename)
   if not stat or stat.type ~= "file" or stat.size > 512 * 1024 then
     vim.notify("This material is missing, unsafe or too large", vim.log.levels.WARN)
@@ -241,7 +344,16 @@ function M.examples_selected()
   if not entry then
     return
   end
-  local example_root = entry.directory .. "/.learning/examples"
+  local root = material_directory(entry)
+  if not root then
+    vim.notify("No materials are cached for this lesson revision", vim.log.levels.WARN)
+    return
+  end
+  local example_root = root .. "/examples"
+  if not real_directory(example_root) then
+    vim.notify("No cached examples for this lesson revision", vim.log.levels.INFO)
+    return
+  end
   local files = {}
   local function scan(dir, prefix, depth)
     if depth > 5 or #files >= 100 then
@@ -258,7 +370,7 @@ function M.examples_selected()
       end
       if name:match("^[a-zA-Z0-9][a-zA-Z0-9._-]*$") and name ~= "." and name ~= ".." then
         local filename = dir .. "/" .. name
-        if kind == "directory" then
+        if kind == "directory" and real_directory(filename) then
           scan(filename, prefix .. name .. "/", depth + 1)
         elseif kind == "file" then
           local stat = vim.uv.fs_lstat(filename)
@@ -350,6 +462,7 @@ function M.open()
     q = M.close,
     r = M.refresh,
     b = render_entries,
+    o = M.open_task_selected,
     l = M.lesson_selected,
     a = M.task_selected,
     z = M.quiz_selected,

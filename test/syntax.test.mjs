@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import luaparse from "luaparse";
 
-for (const filename of ["plugin/codechuman.lua", "lua/codechuman/init.lua"]) {
+for (const filename of ["plugin/codechuman.lua", "lua/codechuman/init.lua", "lua/codechuman/teacher.lua", "lua/codechuman/sync.lua"]) {
   test(`Lua syntax: ${filename}`, () => {
     const source = readFileSync(new URL(`../${filename}`, import.meta.url), "utf8");
     assert.doesNotThrow(() => luaparse.parse(source, { luaVersion: "5.1" }));
@@ -15,6 +15,7 @@ test("plugin provides the expected public commands", () => {
   assert.match(source, /CodechumanOpen/);
   assert.match(source, /CodechumanRefresh/);
   assert.match(source, /CodechumanCheckout/);
+  assert.match(source, /CodechumanOpenTask/);
   assert.match(source, /nargs = 1/);
 });
 
@@ -31,6 +32,15 @@ test("remote checkout uses a temporary secret and CLI stdin pipe without shell a
   assert.match(source, /process:write\(nil\)/);
   assert.doesNotMatch(source, /\"--token\", token/);
   assert.doesNotMatch(source, /vim\.fn\.system\(/);
+});
+
+test("authenticated task open uses open-remote and opens the pinned revision lesson", () => {
+  const source = readFileSync(new URL("../lua/codechuman/init.lua", import.meta.url), "utf8");
+  assert.match(source, /function M\.open_task\(task_instance_id\)/);
+  assert.match(source, /remote_task\(task_instance_id, "open-remote"\)/);
+  assert.match(source, /reply\.materials_directory ~= material_root/);
+  assert.match(source, /vim\.cmd\("edit " \.\. vim\.fn\.fnameescape\(lesson\)\)/);
+  assert.match(source, /function M\.open_task_selected\(\)/);
 });
 
 test("panel can read cached lesson, task, quiz and examples without AI", () => {

@@ -27,3 +27,32 @@ test("native Neovim executes checkout through an authenticated CLI stdin pipe", 
     rmSync(sandbox, { recursive: true, force: true });
   }
 });
+
+test("native Neovim opens the revision-pinned lesson from open-remote", () => {
+  const sandbox = mkdtempSync(join(tmpdir(), "codechuman-nvim-open-"));
+  try {
+    const executable = join(sandbox, "codechuman");
+    copyFileSync(new URL("./fixtures/open_cli_stub.mjs", import.meta.url), executable);
+    chmodSync(executable, 0o700);
+    const result = spawnSync(process.env.NVIM_BIN || "nvim",
+      ["--headless", "-u", "NONE", "-i", "NONE", "-l", join(repo, "test/native_open.lua")], {
+        cwd: repo, encoding: "utf8", timeout: 15000,
+        env: { ...process.env, CODECHUMAN_NVIM_TEST_CLI: executable,
+          CODECHUMAN_NVIM_TEST_ROOT: join(sandbox, "cache") },
+      });
+    if (result.error) throw result.error;
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stdout + result.stderr, /NATIVE_NVIM_OPEN_TASK_PASS/);
+  } finally {
+    rmSync(sandbox, { recursive: true, force: true });
+  }
+});
+
+for (const [file, marker] of [["native_submit_unknown.lua", "NATIVE_SUBMIT_UNKNOWN_FAIL_CLOSED_PASS"], ["native_sync.lua", "NATIVE_SAVED_SYNC_COALESCE_FENCE_PASS"], ["native_teacher.lua", "NATIVE_TEACHER_SESSION_SECURITY_PASS"], ["native_check.lua", "NATIVE_SANDBOX_CHECK_PASS"], ["native_submit.lua", "NATIVE_OFFICIAL_SUBMIT_CONFIRM_REPLAY_PASS"]]) {
+ test(`native Neovim ${file}`, () => {
+  const result=spawnSync(process.env.NVIM_BIN || "nvim",["--headless","-u","NONE","-i","NONE","-l",join(repo,"test",file)],{cwd:repo,encoding:"utf8",timeout:15000});
+  if(result.error)throw result.error;
+  assert.equal(result.status,0,result.stderr || result.stdout);
+  assert.match(result.stdout+result.stderr,new RegExp(marker));
+ });
+}
